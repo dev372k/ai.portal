@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import cors from "cors";
 import dotenv from "dotenv";
 import userRoutes from "./routes/user.routes.js";
+import jobRoutes from "./routes/job.routes.js";
 
 dotenv.config();
 
@@ -19,6 +20,7 @@ mongoose
   .catch((err) => console.log(err));
 
 app.use("/api/users", userRoutes);
+app.use("/api/jobs", jobRoutes);
 
 // app.get("/", (req, res) => {
 //   res.send("app is running...");

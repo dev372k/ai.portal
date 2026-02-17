@@ -8,23 +8,14 @@ import { successResponse } from "../utils/response.js";
 import { asyncHandler } from "../middlewares/asyncHandler.js";
 import { User } from "../models/user.model.js";
 
-
 import OpenAI from "openai";
-// import { PineconeClient } from "@pinecone-database/pinecone";
-
-// const pinecone = new PineconeClient();
-// await pinecone.init({
-//   apiKey: process.env.PINECONE_API_KEY,
-//   environment: process.env.PINECONE_ENVIRONMENT,
-// });
-
-// const index = pinecone.Index("linkedin-resume-match");
-
 
 dotenv.config();
 
 const LINKED_CLIENT_ID = process.env.LINKED_CLIENT_ID;
 const LINKED_CLIENT_SECRET = process.env.LINKED_CLIENT_SECRET;
+const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
+const RAPIDAPI_HOST = process.env.RAPIDAPI_HOST;
 const REDIRECT_URI = process.env.BACKEND_URL + "/api/users/auth/linkedin/callback";
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -32,7 +23,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 export const auth = asyncHandler(async (req, res) => {
     const scope = "profile email openid";
     const state = req.query.user
-
+    console.log("Initiating LinkedIn OAuth flow for user type:", state);
     const authURL = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${LINKED_CLIENT_ID}&redirect_uri=${encodeURIComponent(
         REDIRECT_URI
     )}&state=${state}&scope=${encodeURIComponent(scope)}`;
@@ -41,9 +32,18 @@ export const auth = asyncHandler(async (req, res) => {
 });
 
 export const upload_resume = asyncHandler(async (req, res) => {
-    if (!req.file) return res.status(400).send({ error: "No file uploaded" });
 
-    const data = new Uint8Array(fs.readFileSync(req.file.path));
+    if (!req.file) {
+        return res.status(400).json({
+            message: "No file uploaded"
+        });
+    }
+
+    // 1️⃣ Extract PDF Text
+    const data = new Uint8Array(
+        fs.readFileSync(req.file.path)
+    );
+
     const loadingTask = pdfjsLib.getDocument({ data });
     const pdf = await loadingTask.promise;
 
@@ -56,11 +56,52 @@ export const upload_resume = asyncHandler(async (req, res) => {
         fullText += strings.join(" ") + "\n";
     }
 
+    // Remove file after reading
     fs.unlinkSync(req.file.path);
-    const linkedInData = await fetchLinkedInData("https://www.linkedin.com/in/owais372k/")
-    const percentage = await calculateMatch(linkedInData, fullText)
 
-    successResponse(res, { profile_matched: percentage }, "PDF parsed successfully (pdfjs-dist)");
+    // 2️⃣ Get User
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+        return res.status(404).json({
+            message: "User not found"
+        });
+    }
+
+    // 3️⃣ Fetch LinkedIn Data
+    let linkedInSummary = "";
+
+    if (user.linkedInUrl) {
+        linkedInSummary = await fetchLinkedInData(user.linkedInUrl);
+    }
+
+    // 4️⃣ Calculate Match %
+    let percentage = 0;
+
+    if (linkedInSummary && fullText) {
+        percentage = await calculateMatch(
+            linkedInSummary,
+            fullText
+        );
+    }
+
+    // 5️⃣ Update User Profile
+    user.resumeText = fullText;
+    user.linkedInResumeText = linkedInSummary;
+    user.profileMatchPercentage = Number(percentage.percentage);
+    user.isProfileCompleted = true;
+    user.summary = percentage.summary;
+    user.resumeFileName = req.file.originalname;
+
+    await user.save();
+
+    successResponse(
+        res,
+        {
+            user : user
+        },
+        "Resume uploaded and profile updated successfully"
+    );
 });
 
 // 2) LinkedIn redirects here with "code"
@@ -77,7 +118,7 @@ export const callback = asyncHandler(async (req, res) => {
             error_description
         });
     }
-
+    console.log("state received:", state);
     // Verify state to prevent CSRF attacks
     if (state !== "candidate" && state !== "employer") {
         return res.status(400).send("State mismatch - possible CSRF attack");
@@ -130,11 +171,10 @@ export const callback = asyncHandler(async (req, res) => {
                     email: profileData.email,
                     linkedInToken: accessToken,
                     loginToken: token,
-                    isProfileCompleted: false,
                     profilePic: profileData.picture
                 },
                 $setOnInsert: {
-                    role: state 
+                    role: state
                 }
             },
             { upsert: true, new: true }
@@ -151,36 +191,43 @@ export const callback = asyncHandler(async (req, res) => {
     }
 });
 
-async function getEmbedding(text) {
-    const response = await openai.embeddings.create({
-        model: "text-embedding-3-small", // or text-embedding-3-large for more accuracy
-        input: text,
-    });
-    return response.data[0].embedding;
-}
-
-// async function storeInPinecone(id, embedding) {
-//   await index.upsert({
-//     upsertRequest: {
-//       vectors: [{ id, values: embedding }],
-//     },
-//   });
-// }
-
-function cosineSimilarity(vecA, vecB) {
-    const dot = vecA.reduce((sum, a, i) => sum + a * vecB[i], 0);
-    const magA = Math.sqrt(vecA.reduce((sum, val) => sum + val * val, 0));
-    const magB = Math.sqrt(vecB.reduce((sum, val) => sum + val * val, 0));
-    return dot / (magA * magB);
-}
-
 async function calculateMatch(linkedInText, resumeText) {
-    const linkedInEmbedding = await getEmbedding(linkedInText);
-    const resumeEmbedding = await getEmbedding(resumeText);
+  try {
+    const response = await axios.post(
+      "https://sharp-gpt.ai/PostAPIRequest",
+      {
+        inputPrompt: "Compare Resume and LinkedIn profile",
+        ChatMessage: [
+          {
+            role: "system",
+            content:
+              "You are a resume analyzer. Compare the LinkedIn profile text with the resume text and return ONLY valid JSON. No markdown. Format: {\"percentage\":0,\"summary\":\"\"}. Percentage should represent similarity from 0 to 100."
+          },
+          {
+            role: "user",
+            content: JSON.stringify({
+              linkedInProfile: linkedInText,
+              resume: resumeText
+            })
+          }
+        ],
+        userResume: null
+      },
+      { headers: { "Content-Type": "application/json" } }
+    );
 
-    const similarity = cosineSimilarity(linkedInEmbedding, resumeEmbedding);
-    const percentage = (similarity * 100).toFixed(2);
-    return percentage;
+    const parsedOuter = JSON.parse(response.data.data);
+
+    let content = parsedOuter.choices[0].message.content;
+    content = content.replace(/```json|```/g, "").trim();
+
+    const finalJSON = JSON.parse(content);
+    return finalJSON; // { percentage: 78, summary: "..." }
+
+  } catch (error) {
+    console.error("AI Match Error:", error.message);
+    return { percentage: 0, summary: "Evaluation failed" };
+  }
 }
 
 async function fetchLinkedInData(linkedInURL) {
@@ -192,8 +239,8 @@ async function fetchLinkedInData(linkedInURL) {
             maxBodyLength: Infinity,
             url: 'https://realtime-linkedin-fresh-data.p.rapidapi.com/person',
             headers: {
-                'x-rapidapi-key': 'bced091194msh291021e27e760d7p1b5f00jsn82b5a498a10b',
-                'x-rapidapi-host': 'realtime-linkedin-fresh-data.p.rapidapi.com/calculate',
+                'x-rapidapi-key': RAPIDAPI_KEY,
+                'x-rapidapi-host': RAPIDAPI_HOST,
                 'Content-Type': 'application/json'
             },
             data: JSON.stringify(data)
@@ -248,11 +295,11 @@ function summarizeLinkedIn(linkedInResponse) {
 export const getToken = asyncHandler(async (req, res) => {
     const { token } = req.query;
 
-    const user = await User.find({ loginToken: token });
+    const user = await User.findOne({ loginToken: token });
     if (!user) throw new Error("Invalid email or password");
-
+    console.log("User found for token:", user);
     const jwtToken = jwt.sign(
-        { id: user.id, email: user.email, role: user.role },
+        { id: user._id, email: user.email, role: user.role },
         process.env.JWT_SECRET,
         { expiresIn: "30d" }
     );

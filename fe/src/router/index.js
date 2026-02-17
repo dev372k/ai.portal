@@ -11,6 +11,8 @@ import DashboardView from '../views/DashboardView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import JobView from '../views/employer/JobView.vue'
 import ApplicantView from '../views/employer/ApplicantView.vue'
+import AppliedJobs from '../views/candidate/AppliedJobs.vue'
+
 
 
 const routes = [
@@ -65,6 +67,18 @@ const routes = [
         path: 'jobs',
         name: 'Jobs',
         component: JobView
+      }
+    ]
+  },
+    {
+    path: '/',
+    component: DashboardLayout,
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: 'applied-jobs',
+        name: 'AppliedJobs',
+        component: AppliedJobs
       }
     ]
   },

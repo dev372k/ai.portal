@@ -13,6 +13,7 @@ export const authGuard = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log("Decoded JWT:", decoded);
     req.user = decoded; // attach user info (id, email, role, etc.)
     next();
   } catch (err) {
@@ -26,7 +27,7 @@ export const authorizeRoles = (...allowedRoles) => {
     if (!req.user) {
       return errorResponse(res, "Unauthorized access", 401);
     }
-
+    console.log("User role:", req.user, "Allowed roles:", allowedRoles);
     if (!allowedRoles.includes(req.user.role)) {
       return errorResponse(res, "Forbidden: Access denied", 403);
     }

@@ -12,6 +12,9 @@ const userSchema = new mongoose.Schema({
     resumeText: String,
     linkedInResumeText: String,
     profileMatchPercentage: Number,
+    summary: String,
+    resumeFileName: String  
+}, { timestamps: true
 });
 
 export const User = mongoose.model("user", userSchema);

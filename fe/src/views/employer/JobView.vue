@@ -3,265 +3,448 @@
 
     <!-- HEADER -->
     <div class="flex justify-between items-center mb-8">
-      <h1 class="text-3xl font-bold text-gray-800">Manage Jobs</h1>
+      <h1 class="text-3xl font-bold text-gray-800">
+        {{ isEmployer ? "Manage Jobs" : "Available Jobs" }}
+      </h1>
 
-      <button 
-        @click="openAddModal"
-        class="bg-blue-600 text-white px-5 py-3 rounded-xl shadow-lg hover:bg-blue-700 transition flex items-center gap-2">
-        <span class="text-xl">＋</span> Add Job
+      <button v-if="isEmployer" @click="openAddModal" :disabled="submitting"
+        class="bg-blue-600 text-white px-5 py-3 rounded-xl shadow hover:bg-blue-700 disabled:opacity-50">
+        ＋ Add Job
       </button>
     </div>
 
-    <!-- SKELETON LOADER -->
-    <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <div v-for="n in 6" :key="n" class="p-5 bg-white border rounded-2xl shadow animate-pulse">
-        <div class="h-5 w-40 bg-gray-300 rounded mb-4"></div>
-        <div class="h-4 w-28 bg-gray-200 rounded mb-2"></div>
-        <div class="h-4 w-20 bg-gray-200 rounded"></div>
-
-        <div class="mt-6 h-10 bg-gray-200 rounded"></div>
-      </div>
+    <!-- LOADING -->
+    <div v-if="loading" class="text-center py-10 text-gray-500">
+      Loading jobs...
     </div>
 
-    <!-- JOB CARDS -->
-    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <div
-        v-for="job in jobs"
-        :key="job._id"
-        class="p-6 bg-white border rounded-2xl shadow hover:shadow-xl transition cursor-pointer flex flex-col justify-between">
+    <!-- JOB GRID -->
+    <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
 
-        <!-- Title -->
+      <div v-for="job in jobs" :key="job._id"
+        class="bg-white p-6 rounded-2xl shadow border flex flex-col justify-between">
+
         <div>
-          <h2 class="text-xl font-bold text-gray-800">{{ job.title }}</h2>
+          <h2 @click="openDetailsModal(job)"
+            class="text-lg font-bold cursor-pointer hover:text-blue-600 hover:underline">
+            {{ job.title }}
+          </h2>
+
           <p class="text-gray-500 mt-1">{{ job.company }}</p>
 
-          <div class="mt-3 flex gap-2">
-            <span class="px-3 py-1 bg-blue-50 text-blue-700 text-sm rounded-xl">{{ job.location }}</span>
-            <span class="px-3 py-1 bg-purple-50 text-purple-700 text-sm rounded-xl">{{ job.type }}</span>
+          <div class="flex flex-wrap gap-2 mt-3">
+            <span class="badge bg-blue-100 text-blue-700">{{ job.location }}</span>
+            <span class="badge bg-purple-100 text-purple-700">{{ job.type }}</span>
+            <span class="badge bg-gray-100 text-gray-700">{{ job.experienceLevel }}</span>
+          </div>
+
+          <div class="flex flex-wrap gap-2 mt-3">
+            <span v-for="skill in job.skills" :key="skill" class="px-2 py-1 bg-gray-200 rounded text-xs">
+              {{ skill }}
+            </span>
           </div>
         </div>
 
-        <!-- Skills -->
-        <div class="mt-4 flex flex-wrap gap-2">
-          <span 
-            v-for="skill in job.skills"
-            :key="skill"
-            class="px-3 py-1 bg-gray-100 text-gray-700 text-xs rounded-lg">
+        <!-- FOOTER -->
+        <div class="mt-6">
+
+          <!-- Candidate -->
+          <template v-if="!isEmployer">
+
+            <!-- Already Applied -->
+            <span v-if="job.isApplied"
+              class="w-full inline-block text-center px-4 py-2 bg-green-100 text-green-700 rounded text-sm font-medium">
+              Applied ✓
+            </span>
+
+            <!-- Apply Button -->
+            <button v-else @click="user.isProfileCompleted && openApplicationModal(job)"
+              :disabled="!user?.isProfileCompleted"
+              :title="!user?.isProfileCompleted ? 'Please complete your profile first' : ''"
+              class="w-full px-4 py-2 rounded border transition font-medium" :class="user?.isProfileCompleted
+                ? 'border-blue-600 text-blue-600 hover:bg-blue-50'
+                : 'border-gray-300 text-gray-400 cursor-not-allowed'">
+
+              Apply Now
+
+            </button>
+
+          </template>
+
+          <!-- Employer -->
+          <template v-else>
+            <div class="flex gap-2">
+
+              <!-- Edit (Outline Neutral) -->
+              <button @click="openEditModal(job)" :disabled="submitting"
+                class="flex-1 px-3 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition disabled:opacity-50">
+                Edit
+              </button>
+
+              <!-- Delete (Outline Danger) -->
+              <button @click="deleteJob(job._id)" :disabled="deletingId === job._id"
+                class="flex-1 px-3 py-2 border border-red-500 text-red-600 rounded hover:bg-red-50 transition disabled:opacity-50">
+                {{ deletingId === job._id ? "Deleting..." : "Delete" }}
+              </button>
+
+            </div>
+          </template>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= ADD / EDIT MODAL ================= -->
+
+    <div v-if="showAddModal || showEditModal"
+      class="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center">
+
+      <div class="bg-white p-6 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+
+        <h2 class="text-xl font-semibold mb-4">
+          {{ showEditModal ? "Edit Job" : "Add Job" }}
+        </h2>
+
+        <input v-model="form.title" placeholder="Job Title" class="w-full border px-3 py-2 rounded mb-3" />
+
+        <input v-model="form.company" placeholder="Company" class="w-full border px-3 py-2 rounded mb-3" />
+
+        <!-- LOCATION -->
+        <select v-model="form.location" class="w-full border px-3 py-2 rounded mb-3">
+          <option value="Remote">Remote</option>
+          <option value="On-site">On-site</option>
+          <option value="Hybrid">Hybrid</option>
+        </select>
+
+        <!-- TYPE -->
+        <select v-model="form.type" class="w-full border px-3 py-2 rounded mb-3">
+          <option value="Full-time">Full-time</option>
+          <option value="Part-time">Part-time</option>
+          <option value="Contract">Contract</option>
+          <option value="Internship">Internship</option>
+          <option value="Temporary">Temporary</option>
+        </select>
+
+        <!-- EXPERIENCE -->
+        <select v-model="form.experienceLevel" class="w-full border px-3 py-2 rounded mb-3">
+          <option value="Entry">Entry</option>
+          <option value="Mid">Mid</option>
+          <option value="Senior">Senior</option>
+          <option value="Lead">Lead</option>
+        </select>
+
+        <input v-model="skillsInput" placeholder="Skills (comma separated)"
+          class="w-full border px-3 py-2 rounded mb-3" />
+
+        <textarea v-model="form.description" placeholder="Job Description"
+          class="w-full border px-3 py-2 rounded mb-3 h-40">
+    </textarea>
+
+        <div class="flex justify-end gap-3">
+          <button @click="closeJobModal" class="px-4 py-2 bg-gray-300 rounded">
+            Cancel
+          </button>
+
+          <button @click="showEditModal ? updateJob() : createJob()" :disabled="submitting"
+            class="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50">
+            {{ submitting ? "Processing..." : (showEditModal ? "Update" : "Create") }}
+          </button>
+        </div>
+
+      </div>
+    </div>
+    <!-- ================= JOB DETAILS MODAL ================= -->
+
+    <div v-if="showDetailsModal" class="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center">
+
+      <div class="bg-white p-6 rounded-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+
+        <h2 class="text-2xl font-bold mb-2">
+          {{ selectedJob?.title }}
+        </h2>
+
+        <p class="text-gray-600 mb-4">
+          {{ selectedJob?.company }}
+        </p>
+
+        <div class="flex flex-wrap gap-2 mb-4">
+          <span class="badge bg-blue-100 text-blue-700">
+            {{ selectedJob?.location }}
+          </span>
+          <span class="badge bg-purple-100 text-purple-700">
+            {{ selectedJob?.type }}
+          </span>
+          <span class="badge">
+            {{ selectedJob?.experienceLevel }}
+          </span>
+        </div>
+
+        <h3 class="font-semibold mb-2">Job Description</h3>
+        <p class="text-gray-700 whitespace-pre-line mb-6">
+          {{ selectedJob?.description }}
+        </p>
+
+        <h3 class="font-semibold mb-2">Required Skills</h3>
+        <div class="flex flex-wrap gap-2">
+          <span v-for="skill in selectedJob?.skills" :key="skill" class="px-3 py-1 bg-gray-200 rounded text-xs">
             {{ skill }}
           </span>
         </div>
 
-        <!-- Buttons -->
-        <div class="mt-6 flex gap-3">
-          <button 
-            @click.stop="openEditModal(job)"
-            class="flex-1 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
-            Edit
-          </button>
-          <button 
-            @click.stop="deleteJob(job._id)"
-            class="flex-1 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
-            Delete
+        <div class="flex justify-end mt-6">
+          <button @click="closeDetailsModal" class="px-4 py-2 bg-gray-300 rounded">
+            Close
           </button>
         </div>
+
       </div>
     </div>
+    <!-- ================= APPLICATION MODAL ================= -->
 
-    <!-- MODAL -->
-    <div 
-      v-if="showModal"
-      class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center p-4 backdrop-blur-sm">
+    <div v-if="showApplicationModal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
 
-      <div class="bg-white p-6 rounded-2xl w-full max-w-xl shadow-lg animate-fade-in">
+      <div class="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
 
-        <h2 class="text-xl font-semibold mb-4">
-          {{ isEditing ? "Update Job" : "Add New Job" }}
-        </h2>
-
-        <!-- FORM -->
-        <div class="grid gap-4">
-          <input v-model="form.title" placeholder="Job Title" class="input" />
-          <input v-model="form.company" placeholder="Company" class="input" />
-          <textarea v-model="form.description" placeholder="Job Description" class="input h-24"></textarea>
-
-          <select v-model="form.location" class="input">
-            <option>Remote</option>
-            <option>On-site</option>
-            <option>Hybrid</option>
-          </select>
-
-          <select v-model="form.type" class="input">
-            <option>Full-time</option>
-            <option>Part-time</option>
-            <option>Contract</option>
-            <option>Internship</option>
-            <option>Temporary</option>
-          </select>
-
-          <select v-model="form.experienceLevel" class="input">
-            <option>Entry</option>
-            <option>Mid</option>
-            <option>Senior</option>
-            <option>Lead</option>
-          </select>
-
-          <input v-model="form.applyUrl" placeholder="Apply URL" class="input" />
-
-          <!-- SKILLS -->
-          <div>
-            <input 
-              v-model="skillInput"
-              @keyup.enter="addSkill"
-              placeholder="Add skill & press Enter"
-              class="input" />
-
-            <div class="flex flex-wrap gap-2 mt-2">
-              <span 
-                v-for="(skill, index) in form.skills"
-                :key="index"
-                class="px-3 py-1 bg-gray-200 rounded-xl flex items-center gap-2 text-sm">
-                {{ skill }}
-                <button @click="removeSkill(index)" class="text-red-500">✕</button>
-              </span>
-            </div>
-          </div>
+        <!-- HEADER -->
+        <div class="p-6 border-b">
+          <h2 class="text-xl">
+            Apply for <span class="font-semibold">{{ selectedJob?.title }}</span>
+          </h2>
         </div>
 
-        <!-- ACTIONS -->
-        <div class="mt-6 flex justify-end gap-3">
-          <button 
-            @click="closeModal"
-            class="px-4 py-2 bg-gray-200 rounded-lg">
+        <!-- SCROLLABLE BODY -->
+        <div class="p-6 overflow-y-auto flex-1">
+
+          <div v-for="(question, index) in selectedJob?.aiQuestions" :key="index" class="mb-6">
+
+            <p class="font-medium mb-2">
+              {{ index + 1 }}. {{ question }}
+            </p>
+
+            <textarea v-model="answers[index]" class="w-full border rounded px-3 py-2 h-24"
+              placeholder="Max 30 words..."></textarea>
+
+            <p class="text-xs mt-1" :class="isWordValid(index) ? 'text-green-600' : 'text-red-500'">
+              {{ wordCount(index) }} / 30 words
+            </p>
+
+          </div>
+
+        </div>
+
+        <!-- FOOTER -->
+        <div class="p-6 border-t flex justify-end gap-3">
+          <button @click="closeApplicationModal" class="px-4 py-2 bg-gray-300 rounded">
             Cancel
           </button>
 
-          <button 
-            @click="isEditing ? updateJob() : saveJob()"
-            class="px-4 py-2 bg-blue-600 text-white rounded-lg">
-            {{ isEditing ? "Update" : "Save" }}
+          <button @click="submitApplication" :disabled="!isAnswersValid || submittingApplication"
+            class="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50">
+            {{ submittingApplication ? "Submitting..." : "Submit Application" }}
           </button>
         </div>
 
       </div>
     </div>
-
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
+import axios from "axios";
 
-const loading = ref(true);
+const API = "http://localhost:3000/api/jobs";
+const token = localStorage.getItem("auth_token");
+
 const jobs = ref([]);
+const loading = ref(false);
+const submitting = ref(false);
+const deletingId = ref(null);
 
-const showModal = ref(false);
-const isEditing = ref(false);
+const showAddModal = ref(false);
+const showEditModal = ref(false);
+const showApplicationModal = ref(false);
+const showDetailsModal = ref(false);
+
+const selectedJob = ref(null);
+const answers = ref([]);
+const submittingApplication = ref(false);
+
+const user = ref(JSON.parse(localStorage.getItem("user")));
+const isEmployer = computed(() => user.value?.role === "employer");
 
 const form = ref({
-  _id: null,
   title: "",
   company: "",
   description: "",
-  location: "Remote",
+  location: "On-site",
   type: "Full-time",
   experienceLevel: "Entry",
-  applyUrl: "",
   skills: []
 });
 
-const skillInput = ref("");
+const skillsInput = ref("");
 
-onMounted(() => {
-  setTimeout(() => {
-    jobs.value = [
-      {
-        _id: "123",
-        title: "Frontend Developer",
-        company: "Beechmind Technology",
-        description: "Vue.js Developer Needed",
-        location: "Remote",
-        type: "Full-time",
-        experienceLevel: "Mid",
-        skills: ["Vue", "JavaScript", "Tailwind"],
-        applyUrl: ""
-      }
-    ];
+onMounted(fetchJobs);
+
+async function fetchJobs() {
+  loading.value = true;
+  try {
+    const res = await axios.get(API, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    jobs.value = res.data.data;
+  } finally {
     loading.value = false;
-  }, 1000);
-});
+  }
+}
 
-/* ---- MODAL ---- */
+/* ===== EMPLOYER ===== */
+
+function resetForm() {
+  form.value = {
+    title: "",
+    company: "",
+    description: "",
+    location: "On-site",
+    type: "Full-time",
+    experienceLevel: "Entry",
+    skills: []
+  };
+  skillsInput.value = "";
+}
+
 function openAddModal() {
   resetForm();
-  isEditing.value = false;
-  showModal.value = true;
+  showAddModal.value = true;
 }
 
 function openEditModal(job) {
   form.value = { ...job };
-  isEditing.value = true;
-  showModal.value = true;
+  skillsInput.value = job.skills?.join(", ") || "";
+  showEditModal.value = true;
 }
 
-function closeModal() {
-  showModal.value = false;
+function openDetailsModal(job) {
+  selectedJob.value = job;
+  showDetailsModal.value = true;
 }
 
-/* ---- SKILLS ---- */
-function addSkill() {
-  if (skillInput.value.trim() !== "") {
-    form.value.skills.push(skillInput.value.trim());
-    skillInput.value = "";
+function closeDetailsModal() {
+  showDetailsModal.value = false;
+  selectedJob.value = null;
+}
+
+function closeJobModal() {
+  showAddModal.value = false;
+  showEditModal.value = false;
+  resetForm();
+}
+
+async function createJob() {
+  submitting.value = true;
+  try {
+    form.value.skills = skillsInput.value.split(",").map(s => s.trim());
+    const res = await axios.post(API, form.value, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    jobs.value.push(res.data.data);
+    closeJobModal();
+  } finally {
+    submitting.value = false;
   }
 }
 
-function removeSkill(index) {
-  form.value.skills.splice(index, 1);
+async function updateJob() {
+  submitting.value = true;
+  try {
+    form.value.skills = skillsInput.value.split(",").map(s => s.trim());
+    const res = await axios.put(
+      `${API}/${form.value._id}`,
+      form.value,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const index = jobs.value.findIndex(j => j._id === form.value._id);
+    jobs.value[index] = res.data.data;
+    closeJobModal();
+  } finally {
+    submitting.value = false;
+  }
 }
 
-/* ---- CRUD ---- */
-function saveJob() {
-  form.value._id = Date.now();
-  jobs.value.push({ ...form.value });
-  closeModal();
+async function deleteJob(id) {
+  if (!confirm("Delete this job?")) return;
+  deletingId.value = id;
+  try {
+    await axios.delete(`${API}/${id}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    jobs.value = jobs.value.filter(j => j._id !== id);
+  } finally {
+    deletingId.value = null;
+  }
 }
 
-function updateJob() {
-  const index = jobs.value.findIndex(j => j._id === form.value._id);
-  jobs.value[index] = { ...form.value };
-  closeModal();
+/* ===== CANDIDATE ===== */
+
+function openApplicationModal(job) {
+  selectedJob.value = job;
+  answers.value = job.aiQuestions.map(() => "");
+  showApplicationModal.value = true;
 }
 
-function deleteJob(id) {
-  jobs.value = jobs.value.filter(j => j._id !== id);
+function closeApplicationModal() {
+  showApplicationModal.value = false;
+  selectedJob.value = null;
+  answers.value = [];
 }
 
-function resetForm() {
-  form.value = {
-    _id: null,
-    title: "",
-    company: "",
-    description: "",
-    location: "Remote",
-    type: "Full-time",
-    experienceLevel: "Entry",
-    applyUrl: "",
-    skills: []
-  };
+function wordCount(index) {
+  if (!answers.value[index]) return 0;
+  return answers.value[index].trim().split(/\s+/).filter(Boolean).length;
+}
+
+function isWordValid(index) {
+  const count = wordCount(index);
+  return count > 0 && count <= 30;
+}
+
+const isAnswersValid = computed(() =>
+  answers.value.length > 0 &&
+  answers.value.every((_, i) => isWordValid(i))
+);
+
+async function submitApplication() {
+  submittingApplication.value = true;
+  try {
+    const formattedAnswers = selectedJob.value.aiQuestions.map(
+      (question, index) => ({
+        question,
+        answer: answers.value[index]
+      })
+    );
+
+    await axios.post(
+      `${API}/apply`,
+      {
+        jobId: selectedJob.value._id,
+        answers: formattedAnswers
+      },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    const job = jobs.value.find(j => j._id === selectedJob.value._id);
+    if (job) job.isApplied = true;
+
+    closeApplicationModal();
+  } finally {
+    submittingApplication.value = false;
+  }
 }
 </script>
 
 <style scoped>
-.input {
-  @apply w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400 focus:outline-none;
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.25s ease;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+.badge {
+  @apply px-3 py-1 rounded text-xs;
 }
 </style>

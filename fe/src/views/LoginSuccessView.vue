@@ -34,7 +34,7 @@ async function handleTokenExchange() {
 
     toast.success("Logged in successfully!");
 
-    router.push("/dashboard");
+    router.push("/jobs");
 
   } catch (err) {
     toast.error("Login failed");

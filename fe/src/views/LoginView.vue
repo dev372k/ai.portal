@@ -64,7 +64,6 @@
 
 <script setup>
 function loginWithLinkedIn(role) {
-  // role is 'candidate' or 'employer'
   const baseUrl = "http://localhost:3000/api/users/auth/linkedin";
   window.location.href = `${baseUrl}?user=${role}`;
 }
