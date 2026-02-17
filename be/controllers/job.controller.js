@@ -26,7 +26,7 @@ export const createJob = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: "Missing required fields" });
   }
 
-  const aiQuestions = await generateJobQuestions(description);
+  const aiQuestions = await generateJobQuestions(description, skills);
 
   const job = await Job.create({
     title,
@@ -504,12 +504,12 @@ export const updateApplicationStatus = asyncHandler(async (req, res) => {
    AI QUESTION GENERATOR
 ===================================================== */
 
-async function generateJobQuestions(job_description) {
+async function generateJobQuestions(job_description, skills = "") {
   try {
     const response = await axios.post(
       "https://sharp-gpt.ai/PostAPIRequest",
       {
-        inputPrompt: job_description,
+        inputPrompt: job_description + " Skills required: " + skills,
         ChatMessage: [
           { role: "user", content: "" },
           {
