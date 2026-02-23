@@ -50,8 +50,6 @@ export const apiRequest = async (method, url, data = {}, params = {}) => {
     const res = await api({ method, url, data, params });
     if(method.toLowerCase() !== "get")
       toast.success(res.data?.message);
-
-    console.log(res.data)
     return res.data;
   } catch (error) {
     const response = error.response || {};

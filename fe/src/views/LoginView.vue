@@ -3,7 +3,7 @@
 
     <!-- Left: Branding / Illustration -->
     <div class="w-9/12 bg-gradient-to-tr from-blue-800 to-blue-500 flex flex-col justify-center items-center text-white p-12">
-      <h1 class="text-5xl font-extrabold mb-6">Authentix</h1>
+      <h1 class="text-5xl font-extrabold mb-6">ACRE</h1>
       <p class="text-lg max-w-lg text-center leading-relaxed">
         Strip away the spin. Hire proven talent, not polished narratives.
       </p>

@@ -118,7 +118,6 @@ export const callback = asyncHandler(async (req, res) => {
             error_description
         });
     }
-    console.log("state received:", state);
     // Verify state to prevent CSRF attacks
     if (state !== "candidate" && state !== "employer") {
         return res.status(400).send("State mismatch - possible CSRF attack");
@@ -297,7 +296,7 @@ export const getToken = asyncHandler(async (req, res) => {
 
     const user = await User.findOne({ loginToken: token });
     if (!user) throw new Error("Invalid email or password");
-    console.log("User found for token:", user);
+    
     const jwtToken = jwt.sign(
         { id: user._id, email: user.email, role: user.role },
         process.env.JWT_SECRET,

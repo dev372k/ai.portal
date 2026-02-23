@@ -515,7 +515,7 @@ async function generateJobQuestions(job_description, skills = "") {
           {
             role: "system",
             content:
-              "generate technical questions related to job description also keep them short. Return ONLY valid JSON. Do not include markdown. Format: {\"questions\":[]}"
+              "generate 10 technical questions related to job description also keep them short. Return ONLY valid JSON. Do not include markdown. Format: {\"questions\":[]}"
           }
         ],
         userResume: null

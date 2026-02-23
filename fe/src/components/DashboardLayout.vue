@@ -111,6 +111,7 @@ const employerMenu = [
   { label: "Profile", path: "/profile", icon: UserIcon },
 ];
 
+
 const menuItems = computed(() =>
   role.value === "employer" ? employerMenu : candidateMenu
 );

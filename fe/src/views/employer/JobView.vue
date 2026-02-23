@@ -35,7 +35,7 @@
           <div class="flex flex-wrap gap-2 mt-3">
             <span class="badge bg-blue-100 text-blue-700">{{ job.location }}</span>
             <span class="badge bg-purple-100 text-purple-700">{{ job.type }}</span>
-            <span class="badge bg-gray-100 text-gray-700">{{ job.experienceLevel }}</span>
+            <span class="badge bg-orange-100 text-orange-700">{{ job.experienceLevel }}</span>
           </div>
 
           <div class="flex flex-wrap gap-2 mt-3">
@@ -174,7 +174,7 @@
           <span class="badge bg-purple-100 text-purple-700">
             {{ selectedJob?.type }}
           </span>
-          <span class="badge">
+          <span class="badge bg-orange-100 text-orange-700">
             {{ selectedJob?.experienceLevel }}
           </span>
         </div>
@@ -250,7 +250,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import axios from "axios";
 
 const API = "http://localhost:3000/api/jobs";
@@ -285,7 +285,22 @@ const form = ref({
 
 const skillsInput = ref("");
 
-onMounted(fetchJobs);
+onMounted(() => {
+  fetchJobs();
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+  document.addEventListener("contextmenu", disableRightClick);
+  document.addEventListener("keydown", preventKeySecurity);
+
+  devtoolsInterval = setInterval(detectDevTools, 1000);
+});
+
+onUnmounted(() => {
+  document.removeEventListener("visibilitychange", handleVisibilityChange);
+  document.removeEventListener("contextmenu", disableRightClick);
+  document.removeEventListener("keydown", preventKeySecurity);
+
+  clearInterval(devtoolsInterval);
+});
 
 async function fetchJobs() {
   loading.value = true;
@@ -388,8 +403,14 @@ async function deleteJob(id) {
 /* ===== CANDIDATE ===== */
 
 function openApplicationModal(job) {
-  selectedJob.value = job;
-  answers.value = job.aiQuestions.map(() => "");
+  const randomQuestions = getRandomQuestions(job.aiQuestions, 4);
+
+  selectedJob.value = {
+    ...job,
+    aiQuestions: randomQuestions
+  };
+
+  answers.value = randomQuestions.map(() => "");
   showApplicationModal.value = true;
 }
 
@@ -439,6 +460,80 @@ async function submitApplication() {
     closeApplicationModal();
   } finally {
     submittingApplication.value = false;
+  }
+}
+
+/* ===== RANDOM QUESTION SELECTOR ===== */
+
+function getRandomQuestions(questions, count = 4) {
+  if (!questions || questions.length <= count) return questions;
+
+  const shuffled = [...questions].sort(() => 0.5 - Math.random());
+  return shuffled.slice(0, count);
+}
+/* ===== SECURITY ENHANCEMENTS ===== */
+
+function preventKeySecurity(e) {
+  if (!showApplicationModal.value) return;
+
+  // Block copy / cut / select all
+  if (
+    (e.ctrlKey || e.metaKey) &&
+    ["c", "x", "a", "s", "u"].includes(e.key.toLowerCase())
+  ) {
+    e.preventDefault();
+  }
+
+  // Block F12
+  if (e.key === "F12") {
+    e.preventDefault();
+  }
+
+  // Block Ctrl+Shift+I / J
+  if (
+    (e.ctrlKey || e.metaKey) &&
+    e.shiftKey &&
+    ["i", "j"].includes(e.key.toLowerCase())
+  ) {
+    e.preventDefault();
+  }
+}
+
+function disableRightClick(e) {
+  if (showApplicationModal.value) {
+    e.preventDefault();
+  }
+}
+
+function handleVisibilityChange() {
+  if (document.hidden && showApplicationModal.value) {
+    document.body.style.filter = "blur(20px)";
+    alert("Switching tabs is not allowed during application.");
+    window.location.href = "/";
+  } else {
+    document.body.style.filter = "none";
+  }
+}
+
+let devtoolsOpen = false;
+let devtoolsInterval;
+
+function detectDevTools() {
+  if (!showApplicationModal.value) return;
+
+  const threshold = 160;
+
+  if (
+    window.outerWidth - window.innerWidth > threshold ||
+    window.outerHeight - window.innerHeight > threshold
+  ) {
+    if (!devtoolsOpen) {
+      devtoolsOpen = true;
+      alert("Developer tools are not allowed.");
+      window.location.href = "/";
+    }
+  } else {
+    devtoolsOpen = false;
   }
 }
 </script>

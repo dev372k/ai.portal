@@ -13,7 +13,7 @@ import JobView from '../views/employer/JobView.vue'
 import ApplicantView from '../views/employer/ApplicantView.vue'
 import AppliedJobs from '../views/candidate/AppliedJobs.vue'
 
-
+import AdminView from '../views/admin/AdminView.vue'
 
 const routes = [
 
@@ -32,20 +32,25 @@ const routes = [
     component: LoginSuccessView,
     meta: { guestOnly: true }
   },
-
-  // All authenticated pages use the layout
   {
-    path: '/',
-    component: DashboardLayout,
-    meta: { requiresAuth: true },
-    children: [
-      {
-        path: 'dashboard',
-        name: 'Dashboard',
-        component: DashboardView
-      }
-    ]
+    path: '/admin',
+    name: 'admin',
+    component: AdminView,
+    // meta: { guestOnly: true }
   },
+  // All authenticated pages use the layout
+  // {
+  //   path: '/',
+  //   component: DashboardLayout,
+  //   meta: { requiresAuth: true },
+  //   children: [
+  //     {
+  //       path: 'dashboard',
+  //       name: 'Dashboard',
+  //       component: DashboardView
+  //     }
+  //   ]
+  // },
   {
     path: '/',
     component: DashboardLayout,
@@ -109,7 +114,7 @@ router.beforeEach((to, from, next) => {
   }
 
   if (to.meta.guestOnly && token) {
-    return next('/dashboard')
+    return next('/jobs')
   }
 
   next()
