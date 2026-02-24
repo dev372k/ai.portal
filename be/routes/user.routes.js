@@ -8,24 +8,21 @@ import {
   upload_resume
 } from "../controllers/user.controller.js";
 
-import {
-  authGuard
-} from "../middlewares/authMiddleware.js";
+import { authGuard } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
 /* =====================================================
-   MULTER CONFIGURATION
+   MULTER CONFIGURATION (VERCEL SAFE)
 ===================================================== */
 
-// Store files temporarily in /uploads
+// ✅ Use memory storage (NO filesystem usage)
 const upload = multer({
-  dest: "uploads/",
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 5 * 1024 * 1024 // 5MB limit
   },
   fileFilter: (req, file, cb) => {
-    // Only allow PDF
     if (file.mimetype !== "application/pdf") {
       return cb(new Error("Only PDF files are allowed"), false);
     }
@@ -52,8 +49,8 @@ router.get("/get-token", getToken);
 
 router.post(
   "/upload_resume",
-  authGuard,                  // 🔐 must be logged in
-  upload.single("resume"),    // 🔥 MUST match frontend field name
+  authGuard,
+  upload.single("resume"), // must match frontend field name
   upload_resume
 );
 

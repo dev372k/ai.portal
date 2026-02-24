@@ -106,30 +106,24 @@ export const upload_resume_obselete = asyncHandler(async (req, res) => {
     );
 });
 
-
 export const upload_resume = asyncHandler(async (req, res) => {
 
     try {
 
-        // 1️⃣ Check file
         if (!req.file) {
             return res.status(400).json({
                 message: "No file uploaded"
             });
         }
 
-        // 2️⃣ Read file buffer
-        const buffer = fs.readFileSync(req.file.path);
+        // ✅ Get file buffer directly (memoryStorage)
+        const buffer = req.file.buffer;
 
-        // 3️⃣ Dynamically import pdf-parse (ESM safe)
+        // ✅ ESM-safe import
         const { default: pdf } = await import("pdf-parse");
 
-        // 4️⃣ Extract text
         const pdfData = await pdf(buffer);
         const fullText = pdfData.text?.trim() || "";
-
-        // 5️⃣ Delete uploaded file
-        fs.unlinkSync(req.file.path);
 
         if (!fullText) {
             return res.status(400).json({
@@ -137,7 +131,6 @@ export const upload_resume = asyncHandler(async (req, res) => {
             });
         }
 
-        // 6️⃣ Get user
         const user = await User.findById(req.user.id);
 
         if (!user) {
@@ -146,14 +139,12 @@ export const upload_resume = asyncHandler(async (req, res) => {
             });
         }
 
-        // 7️⃣ Fetch LinkedIn data (if exists)
         let linkedInSummary = "";
 
         if (user.linkedInUrl) {
             linkedInSummary = await fetchLinkedInData(user.linkedInUrl);
         }
 
-        // 8️⃣ Calculate match percentage
         let percentageResult = {
             percentage: 0,
             summary: ""
@@ -166,7 +157,6 @@ export const upload_resume = asyncHandler(async (req, res) => {
             );
         }
 
-        // 9️⃣ Update user profile
         user.resumeText = fullText;
         user.linkedInResumeText = linkedInSummary;
         user.profileMatchPercentage = Number(percentageResult.percentage || 0);
