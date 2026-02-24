@@ -1,7 +1,9 @@
 import axios from "axios";
 import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
-import * as pdfjsLib from "pdfjs-dist";
+// import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.js";
+import pdf from "pdf-parse";
+
 import fs from "fs";
 import crypto from "crypto";
 import { successResponse } from "../utils/response.js";
@@ -31,7 +33,7 @@ export const auth = asyncHandler(async (req, res) => {
     res.redirect(authURL);
 });
 
-export const upload_resume = asyncHandler(async (req, res) => {
+export const upload_resume_obselete = asyncHandler(async (req, res) => {
 
     if (!req.file) {
         return res.status(400).json({
@@ -100,6 +102,67 @@ export const upload_resume = asyncHandler(async (req, res) => {
         {
             user : user
         },
+        "Resume uploaded and profile updated successfully"
+    );
+});
+
+export const upload_resume = asyncHandler(async (req, res) => {
+
+    if (!req.file) {
+        return res.status(400).json({
+            message: "No file uploaded"
+        });
+    }
+
+    // 1️⃣ Extract PDF Text (Vercel Safe)
+    const buffer = fs.readFileSync(req.file.path);
+
+    const pdfData = await pdf(buffer);
+
+    const fullText = pdfData.text;
+
+    // Remove file after reading
+    fs.unlinkSync(req.file.path);
+
+    // 2️⃣ Get User
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+        return res.status(404).json({
+            message: "User not found"
+        });
+    }
+
+    // 3️⃣ Fetch LinkedIn Data
+    let linkedInSummary = "";
+
+    if (user.linkedInUrl) {
+        linkedInSummary = await fetchLinkedInData(user.linkedInUrl);
+    }
+
+    // 4️⃣ Calculate Match %
+    let percentage = 0;
+
+    if (linkedInSummary && fullText) {
+        percentage = await calculateMatch(
+            linkedInSummary,
+            fullText
+        );
+    }
+
+    // 5️⃣ Update User Profile
+    user.resumeText = fullText;
+    user.linkedInResumeText = linkedInSummary;
+    user.profileMatchPercentage = Number(percentage.percentage || 0);
+    user.isProfileCompleted = true;
+    user.summary = percentage.summary || "";
+    user.resumeFileName = req.file.originalname;
+
+    await user.save();
+
+    successResponse(
+        res,
+        { user },
         "Resume uploaded and profile updated successfully"
     );
 });
