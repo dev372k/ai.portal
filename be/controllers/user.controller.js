@@ -1,7 +1,7 @@
 import axios from "axios";
 import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
-import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
+import * as pdfjsLib from "pdfjs-dist";
 import fs from "fs";
 import crypto from "crypto";
 import { successResponse } from "../utils/response.js";
