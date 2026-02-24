@@ -64,8 +64,8 @@
 
 <script setup>
 function loginWithLinkedIn(role) {
-  const baseUrl = "http://localhost:3000/api/users/auth/linkedin";
-  window.location.href = `${baseUrl}?user=${role}`;
+  const API_BASE = import.meta.env.VITE_BACKEND_URL + "/api/users/auth/linkedin";
+  window.location.href = `${API_BASE}?user=${role}`;
 }
 </script>
 

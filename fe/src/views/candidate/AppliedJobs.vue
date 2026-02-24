@@ -102,8 +102,8 @@
 import { ref, onMounted } from "vue";
 import axios from "axios";
 
-const API_GET = "http://localhost:3000/api/jobs/applied-jobs";
-const API_DELETE = "http://localhost:3000/api/applications";
+const API_GET = import.meta.env.VITE_BACKEND_URL + "/api/jobs/applied-jobs";
+const API_DELETE = import.meta.env.VITE_BACKEND_URL + "/api/applications";
 
 const applications = ref([]);
 const loading = ref(false);

@@ -253,7 +253,7 @@
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import axios from "axios";
 
-const API = "http://localhost:3000/api/jobs";
+const API = import.meta.env.VITE_BACKEND_URL + "/api/jobs";
 const token = localStorage.getItem("auth_token");
 
 const jobs = ref([]);

@@ -183,7 +183,7 @@ const user = ref({});
 const linkedInUrl = ref("");
 const resumeFile = ref(null);
 
-const API_BASE = "http://localhost:3000/api/users";
+const API_BASE = import.meta.env.VITE_BACKEND_URL + "/api/users";
 
 /* ================= LOAD USER ================= */
 
