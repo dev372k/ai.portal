@@ -2,7 +2,7 @@ import axios from "axios";
 import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
 // import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.js";
-import pdf from "pdf-parse";
+
 
 import fs from "fs";
 import crypto from "crypto";
@@ -106,65 +106,91 @@ export const upload_resume_obselete = asyncHandler(async (req, res) => {
     );
 });
 
+
 export const upload_resume = asyncHandler(async (req, res) => {
 
-    if (!req.file) {
-        return res.status(400).json({
-            message: "No file uploaded"
-        });
-    }
+    try {
 
-    // 1️⃣ Extract PDF Text (Vercel Safe)
-    const buffer = fs.readFileSync(req.file.path);
+        // 1️⃣ Check file
+        if (!req.file) {
+            return res.status(400).json({
+                message: "No file uploaded"
+            });
+        }
 
-    const pdfData = await pdf(buffer);
+        // 2️⃣ Read file buffer
+        const buffer = fs.readFileSync(req.file.path);
 
-    const fullText = pdfData.text;
+        // 3️⃣ Dynamically import pdf-parse (ESM safe)
+        const { default: pdf } = await import("pdf-parse");
 
-    // Remove file after reading
-    fs.unlinkSync(req.file.path);
+        // 4️⃣ Extract text
+        const pdfData = await pdf(buffer);
+        const fullText = pdfData.text?.trim() || "";
 
-    // 2️⃣ Get User
-    const user = await User.findById(req.user.id);
+        // 5️⃣ Delete uploaded file
+        fs.unlinkSync(req.file.path);
 
-    if (!user) {
-        return res.status(404).json({
-            message: "User not found"
-        });
-    }
+        if (!fullText) {
+            return res.status(400).json({
+                message: "Could not extract text from PDF"
+            });
+        }
 
-    // 3️⃣ Fetch LinkedIn Data
-    let linkedInSummary = "";
+        // 6️⃣ Get user
+        const user = await User.findById(req.user.id);
 
-    if (user.linkedInUrl) {
-        linkedInSummary = await fetchLinkedInData(user.linkedInUrl);
-    }
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found"
+            });
+        }
 
-    // 4️⃣ Calculate Match %
-    let percentage = 0;
+        // 7️⃣ Fetch LinkedIn data (if exists)
+        let linkedInSummary = "";
 
-    if (linkedInSummary && fullText) {
-        percentage = await calculateMatch(
-            linkedInSummary,
-            fullText
+        if (user.linkedInUrl) {
+            linkedInSummary = await fetchLinkedInData(user.linkedInUrl);
+        }
+
+        // 8️⃣ Calculate match percentage
+        let percentageResult = {
+            percentage: 0,
+            summary: ""
+        };
+
+        if (linkedInSummary && fullText) {
+            percentageResult = await calculateMatch(
+                linkedInSummary,
+                fullText
+            );
+        }
+
+        // 9️⃣ Update user profile
+        user.resumeText = fullText;
+        user.linkedInResumeText = linkedInSummary;
+        user.profileMatchPercentage = Number(percentageResult.percentage || 0);
+        user.summary = percentageResult.summary || "";
+        user.resumeFileName = req.file.originalname;
+        user.isProfileCompleted = true;
+
+        await user.save();
+
+        return successResponse(
+            res,
+            { user },
+            "Resume uploaded and profile updated successfully"
         );
+
+    } catch (error) {
+
+        console.error("Resume Upload Error:", error);
+
+        return res.status(500).json({
+            message: "Something went wrong while processing resume",
+            error: error.message
+        });
     }
-
-    // 5️⃣ Update User Profile
-    user.resumeText = fullText;
-    user.linkedInResumeText = linkedInSummary;
-    user.profileMatchPercentage = Number(percentage.percentage || 0);
-    user.isProfileCompleted = true;
-    user.summary = percentage.summary || "";
-    user.resumeFileName = req.file.originalname;
-
-    await user.save();
-
-    successResponse(
-        res,
-        { user },
-        "Resume uploaded and profile updated successfully"
-    );
 });
 
 // 2) LinkedIn redirects here with "code"
