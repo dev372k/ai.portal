@@ -77,7 +77,7 @@
 
               <!-- Edit (Outline Neutral) -->
               <button @click="openEditModal(job)" :disabled="submitting"
-                class="flex-1 px-3 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition disabled:opacity-50">
+                class="flex-1 px-3 py-2 border border-gray-500 text-gray-600 rounded hover:bg-gray-50 transition disabled:opacity-50">
                 Edit
               </button>
 
