@@ -53,7 +53,7 @@
           class="bg-gray-50 border rounded-lg p-4 text-sm text-gray-700 mt-4"
         >
           <h3 class="font-semibold mb-2 text-gray-800">
-            AI Resume Analysis
+            AI Resume Summary
           </h3>
           <p class="leading-relaxed whitespace-pre-line">
             {{ user.summary }}
