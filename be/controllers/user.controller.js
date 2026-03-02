@@ -1,9 +1,6 @@
 import axios from "axios";
 import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
-// import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.js";
-
-
 import fs from "fs";
 import crypto from "crypto";
 import { successResponse } from "../utils/response.js";
@@ -19,6 +16,7 @@ const LINKED_CLIENT_SECRET = process.env.LINKED_CLIENT_SECRET;
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
 const RAPIDAPI_HOST = process.env.RAPIDAPI_HOST;
 const REDIRECT_URI = process.env.BACKEND_URL + "/api/users/auth/linkedin/callback";
+const CONVERT_API_SECRET = process.env.CONVERTAPI_SECRET || "bvXKGglVm1uZYkNd6Zcd4CKAclx1kqZu";
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // /auth/linkedin
@@ -106,81 +104,131 @@ export const upload_resume_obselete = asyncHandler(async (req, res) => {
     );
 });
 
+import { PdfReader } from "pdfreader";
+
 export const upload_resume = asyncHandler(async (req, res) => {
+  try {
 
-    try {
-
-        if (!req.file) {
-            return res.status(400).json({
-                message: "No file uploaded"
-            });
-        }
-
-        // ✅ Get file buffer directly (memoryStorage)
-        const buffer = req.file.buffer;
-
-        // ✅ ESM-safe import
-        const { default: pdf } = await import("pdf-parse");
-
-        const pdfData = await pdf(buffer);
-        const fullText = pdfData.text?.trim() || "";
-
-        if (!fullText) {
-            return res.status(400).json({
-                message: "Could not extract text from PDF"
-            });
-        }
-
-        const user = await User.findById(req.user.id);
-
-        if (!user) {
-            return res.status(404).json({
-                message: "User not found"
-            });
-        }
-
-        let linkedInSummary = "";
-
-        if (user.linkedInUrl) {
-            linkedInSummary = await fetchLinkedInData(user.linkedInUrl);
-        }
-
-        let percentageResult = {
-            percentage: 0,
-            summary: ""
-        };
-
-        if (linkedInSummary && fullText) {
-            percentageResult = await calculateMatch(
-                linkedInSummary,
-                fullText
-            );
-        }
-
-        user.resumeText = fullText;
-        user.linkedInResumeText = linkedInSummary;
-        user.profileMatchPercentage = Number(percentageResult.percentage || 0);
-        user.summary = percentageResult.summary || "";
-        user.resumeFileName = req.file.originalname;
-        user.isProfileCompleted = true;
-
-        await user.save();
-
-        return successResponse(
-            res,
-            { user },
-            "Resume uploaded and profile updated successfully"
-        );
-
-    } catch (error) {
-
-        console.error("Resume Upload Error:", error);
-
-        return res.status(500).json({
-            message: "Something went wrong while processing resume",
-            error: error.message
-        });
+    if (!req.file) {
+      return res.status(400).json({
+        message: "No file uploaded"
+      });
     }
+
+    /* =====================================================
+       1️⃣ Extract PDF Text (Vercel Safe)
+    ===================================================== */
+
+    const rawText = await new Promise((resolve, reject) => {
+      let text = "";
+
+      new PdfReader().parseBuffer(req.file.buffer, (err, item) => {
+        if (err) return reject(err);
+
+        if (!item) {
+          resolve(text.trim());
+        } else if (item.text) {
+          text += item.text + " ";
+        }
+      });
+    });
+
+    if (!rawText) {
+      return res.status(400).json({
+        message: "Could not extract text from PDF"
+      });
+    }
+
+    /* =====================================================
+       2️⃣ Clean Extracted Text (Improves AI Matching)
+    ===================================================== */
+
+    const fullText = rawText
+      .replace(/\s+/g, " ")
+      .replace(/\n\s*\n/g, "\n")
+      .trim();
+
+    /* =====================================================
+       3️⃣ Get User
+    ===================================================== */
+
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found"
+      });
+    }
+
+    /* =====================================================
+       4️⃣ Fetch LinkedIn Data (If Available)
+    ===================================================== */
+
+    let linkedInSummary = "";
+
+    if (user.linkedInUrl) {
+      try {
+        linkedInSummary = await fetchLinkedInData(user.linkedInUrl);
+      } catch (err) {
+        console.warn("LinkedIn fetch failed:", err.message);
+        linkedInSummary = "";
+      }
+    }
+
+    /* =====================================================
+       5️⃣ AI Matching Logic
+    ===================================================== */
+
+    let percentageResult = {
+      percentage: 0,
+      summary: "AI comparison not available."
+    };
+
+    if (linkedInSummary && fullText) {
+      try {
+        percentageResult = await calculateMatch(
+          linkedInSummary,
+          fullText
+        );
+      } catch (err) {
+        console.warn("AI match failed:", err.message);
+      }
+    }
+
+    /* =====================================================
+       6️⃣ Update User Profile in DB
+    ===================================================== */
+
+    user.resumeText = fullText;
+    user.linkedInResumeText = linkedInSummary || "";
+    user.profileMatchPercentage = Number(
+      percentageResult?.percentage || 0
+    );
+    user.summary = percentageResult?.summary || "";
+    user.resumeFileName = req.file.originalname;
+    user.isProfileCompleted = true;
+
+    await user.save();
+
+    /* =====================================================
+       7️⃣ Return Success Response
+    ===================================================== */
+
+    return successResponse(
+      res,
+      { user },
+      "Resume uploaded and profile updated successfully"
+    );
+
+  } catch (error) {
+
+    console.error("Resume Upload Error:", error);
+
+    return res.status(500).json({
+      message: "Something went wrong while processing resume",
+      error: error.message
+    });
+  }
 });
 
 // 2) LinkedIn redirects here with "code"

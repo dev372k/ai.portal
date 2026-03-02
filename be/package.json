@@ -13,6 +13,7 @@
   "dependencies": {
     "@napi-rs/canvas": "^0.1.95",
     "axios": "^1.13.2",
+    "convertapi": "^1.15.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
@@ -22,8 +23,7 @@
     "nodemon": "^3.1.11",
     "openai": "^6.9.1",
     "pdf": "^0.1.0",
-    "pdf-parse": "^2.4.5",
     "pdf2json": "^4.0.0",
-    "pdfjs-dist": "^2.16.105"
+    "pdfreader": "^3.0.8"
   }
 }
