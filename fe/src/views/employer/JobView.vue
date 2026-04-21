@@ -58,7 +58,7 @@
             </span>
 
             <!-- Apply Button -->
-            <button v-else @click="user.isProfileCompleted && openApplicationModal(job)"
+            <!-- <button v-else @click="user.isProfileCompleted && openApplicationModal(job)"
               :disabled="!user?.isProfileCompleted"
               :title="!user?.isProfileCompleted ? 'Please complete your profile first' : ''"
               class="w-full px-4 py-2 rounded border transition font-medium" :class="user?.isProfileCompleted
@@ -67,6 +67,26 @@
 
               Apply Now
 
+            </button> -->
+            <button
+              v-else
+              @click="user.isProfileCompleted && openApplicationModal(job)"
+              :disabled="!user?.isProfileCompleted || isJobBlocked(job._id)"
+              :title="
+                isJobBlocked(job._id)
+                  ? 'You can’t apply anymore'
+                  : !user?.isProfileCompleted
+                  ? 'Please complete your profile first'
+                  : ''
+              "
+              class="w-full px-4 py-2 rounded border transition font-medium"
+              :class="
+                !user?.isProfileCompleted || isJobBlocked(job._id)
+                  ? 'border-gray-300 text-gray-400 cursor-not-allowed'
+                  : 'border-blue-600 text-blue-600 hover:bg-blue-50'
+              "
+            >
+              {{ isJobBlocked(job._id) ? "Blocked" : "Apply Now" }}
             </button>
 
           </template>
@@ -403,6 +423,7 @@ async function deleteJob(id) {
 /* ===== CANDIDATE ===== */
 
 function openApplicationModal(job) {
+  const count = incrementJobView(job._id);
   const randomQuestions = getRandomQuestions(job.aiQuestions, 4);
 
   selectedJob.value = {
@@ -535,6 +556,31 @@ function detectDevTools() {
   } else {
     devtoolsOpen = false;
   }
+}
+
+/* ===== LOCAL STORAGE JOB VIEW TRACKER ===== */
+
+function getJobViewKey(jobId) {
+  return `job_views_${jobId}`;
+}
+
+function incrementJobView(jobId) {
+  const key = getJobViewKey(jobId);
+
+  let count = parseInt(localStorage.getItem(key)) || 0;
+  count++;
+
+  localStorage.setItem(key, count);
+
+  return count;
+}
+
+function getJobViewCount(jobId) {
+  return parseInt(localStorage.getItem(getJobViewKey(jobId))) || 0;
+}
+
+function isJobBlocked(jobId) {
+  return getJobViewCount(jobId) > 1;
 }
 </script>
 
