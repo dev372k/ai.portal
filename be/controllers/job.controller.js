@@ -156,6 +156,25 @@ export const updateJob = asyncHandler(async (req, res) => {
 });
 
 /* =====================================================
+   GET ALL JOBS ADMIN
+===================================================== */
+
+export const getAllJobs = asyncHandler(async (req, res) => {
+  // Only admin can delete
+  if (req.user.role !== "admin") {
+    return res.status(403).json({ message: "Not authorized" });
+  }
+  const jobs = await Job.find()
+    .sort({ createdAt: -1 });
+
+  res.status(200).json({
+    success: true,
+    count: jobs.length,
+    data: jobs
+  });
+});
+
+/* =====================================================
    DELETE JOB (OWNER ONLY)
 ===================================================== */
 
@@ -167,12 +186,14 @@ export const deleteJob = asyncHandler(async (req, res) => {
     return res.status(404).json({ message: "Job not found" });
   }
 
-  if (job.postedBy.toString() !== req.user.id) {
-    return res.status(403).json({ message: "Not authorized" });
-  }
+  if(req.user.role != "admin")
+    if (job.postedBy.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
 
   await job.deleteOne();
 
+  console.log("Deleted job", job)
   res.json({
     success: true,
     message: "Job deleted successfully"

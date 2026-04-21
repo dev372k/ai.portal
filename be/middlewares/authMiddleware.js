@@ -1,10 +1,19 @@
 import jwt from "jsonwebtoken";
 import { errorResponse } from "../utils/response.js";
 
-// ✅ Authenticate JWT
+// ✅ Authenticate JWT OR Admin Header
 export const authGuard = (req, res, next) => {
   const authHeader = req.headers.authorization;
 
+  // ✅ ADD THIS BLOCK (admin mock support)
+  if (req.headers["x-admin"] === "true") {
+    req.user = {
+      role: "admin"
+    };
+    return next();
+  }
+
+  // ⬇️ KEEP EVERYTHING BELOW SAME
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return errorResponse(res, "Unauthorized access", 401);
   }
@@ -14,7 +23,7 @@ export const authGuard = (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    req.user = decoded; // attach user info (id, email, role, etc.)
+    req.user = decoded;
     next();
   } catch (err) {
     return errorResponse(res, "Invalid or expired token", 401);

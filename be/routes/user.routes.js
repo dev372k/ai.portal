@@ -2,13 +2,15 @@ import express from "express";
 import multer from "multer";
 
 import {
+  getAllUsers,
+  deleteUser,
   auth,
   callback,
   getToken,
   upload_resume
 } from "../controllers/user.controller.js";
 
-import { authGuard } from "../middlewares/authMiddleware.js";
+import { authGuard, authorizeRoles } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
@@ -42,6 +44,13 @@ router.get("/auth/linkedin/callback", callback);
 ===================================================== */
 
 router.get("/get-token", getToken);
+
+/* =====================================================
+  USER
+===================================================== */
+
+router.get("/", authGuard, authorizeRoles("admin"), getAllUsers);
+router.delete("/:id", authGuard, authorizeRoles("admin"), deleteUser);
 
 /* =====================================================
    RESUME UPLOAD (PROTECTED)

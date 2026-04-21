@@ -10,7 +10,8 @@ import {
   getMyJobs,
   getJobApplications,
   updateApplicationStatus,
-  getSingleApplication
+  getSingleApplication,
+  getAllJobs
 } from "../controllers/job.controller.js";
 
 import {
@@ -85,6 +86,8 @@ router.post(
   createJob
 );
 
+router.get("/all", authGuard, authorizeRoles("admin"), getAllJobs);
+
 router.get(
   "/",
   authGuard,
@@ -111,8 +114,7 @@ router.put(
 router.delete(
   "/:id",
   authGuard,
-  authorizeRoles("employer"),
+  authorizeRoles("employer", "admin"),
   deleteJob
 );
-
 export default router;

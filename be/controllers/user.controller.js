@@ -20,6 +20,43 @@ const CONVERT_API_SECRET = process.env.CONVERTAPI_SECRET || "bvXKGglVm1uZYkNd6Zc
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // /auth/linkedin
+
+export const getAllUsers = asyncHandler(async (req, res) => {
+  // Only admin can delete
+  if (req.user.role !== "admin") {
+    return res.status(403).json({ message: "Not authorized" });
+  }
+  const users = await User.find().select("-loginToken -linkedInToken");
+
+  res.status(200).json({
+    success: true,
+    count: users.length,
+    data: users
+  });
+});
+
+export const deleteUser = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  // Only admin can delete
+  if (req.user.role !== "admin") {
+    return res.status(403).json({ message: "Not authorized" });
+  }
+
+  const user = await User.findById(id);
+
+  if (!user) {
+    return res.status(404).json({ message: "User not found" });
+  }
+
+  await user.deleteOne();
+
+  res.status(200).json({
+    success: true,
+    message: "User deleted successfully"
+  });
+});
+
 export const auth = asyncHandler(async (req, res) => {
     const scope = "profile email openid";
     const state = req.query.user
